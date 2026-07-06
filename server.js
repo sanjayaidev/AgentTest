@@ -1,11 +1,6 @@
 // server.js
 //
-// Standalone app: create + export Canva designs via the Canva Connect
-// API (OAuth 2.0 + PKCE). This is a self-service integration — create
-// one at https://www.canva.com/developers/integrations and you can
-// authorize users immediately. No allowlist/waitlist approval required
-// (that requirement is specific to Canva's separate MCP server at
-// mcp.canva.com, not this Connect API).
+// Standalone app for Railway deployment
 
 require('dotenv').config();
 const crypto = require('crypto');
@@ -30,9 +25,6 @@ const REQUIRED_ENV = ['CANVA_CLIENT_ID', 'CANVA_CLIENT_SECRET', 'CANVA_REDIRECT_
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// --- tiny cookie-based session, no login system: one anonymous session
-// per browser, good enough for a personal/small-team tool. -------------
 
 const SESSION_COOKIE = 'ccapp_session';
 
@@ -64,13 +56,11 @@ app.use((req, res, next) => {
 function checkEnv(res) {
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
   if (missing.length) {
-    res.status(500).json({ error: `Missing required env var(s): ${missing.join(', ')}. See .env.example.` });
+    res.status(500).json({ error: `Missing required env var(s): ${missing.join(', ')}` });
     return false;
   }
   return true;
 }
-
-// --- OAuth: connect / callback / status / disconnect -------------------
 
 app.get('/auth/canva', (req, res) => {
   if (!checkEnv(res)) return;
@@ -108,7 +98,7 @@ app.get('/auth/canva/callback', async (req, res) => {
 
     res.send(`
       <!doctype html><html><body style="font-family:sans-serif;text-align:center;margin-top:80px;">
-        <h2>&#9989; Canva connected</h2>
+        <h2>✅ Canva connected</h2>
         <p>You can close this tab and go back to the app.</p>
         <script>if (window.opener) { window.opener.postMessage('canva-connected', '*'); }</script>
       </body></html>
@@ -132,8 +122,6 @@ app.post('/api/disconnect', (req, res) => {
   deleteTokens(req.sessionId);
   res.json({ ok: true });
 });
-
-// --- Design + export ----------------------------------------------------
 
 app.post('/api/designs', async (req, res) => {
   try {
@@ -167,8 +155,9 @@ app.post('/api/exports', async (req, res) => {
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`canva-connect-app listening on http://localhost:${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
   if (missing.length) {
-    console.warn(`⚠ Missing env vars: ${missing.join(', ')} — copy .env.example to .env and fill these in.`);
+    console.warn(`⚠ Missing env vars: ${missing.join(', ')}`);
   }
 });
