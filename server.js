@@ -96,12 +96,58 @@ app.get('/auth/canva/callback', async (req, res) => {
     const tokens = await exchangeCodeForTokens(code, pending.verifier);
     saveTokens(pending.sessionId, tokens);
 
+    // Auto-redirect with a success message
     res.send(`
-      <!doctype html><html><body style="font-family:sans-serif;text-align:center;margin-top:80px;">
-        <h2>✅ Canva connected</h2>
-        <p>You can close this tab and go back to the app.</p>
-        <script>if (window.opener) { window.opener.postMessage('canva-connected', '*'); }</script>
-      </body></html>
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Connected to Canva</title>
+          <meta http-equiv="refresh" content="2;url=/">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              text-align: center;
+              margin-top: 80px;
+              background: #0f1115;
+              color: #e8eaed;
+            }
+            .checkmark {
+              font-size: 64px;
+              color: #3ecf6f;
+              margin-bottom: 20px;
+            }
+            .spinner {
+              display: inline-block;
+              margin-top: 20px;
+              width: 24px;
+              height: 24px;
+              border: 3px solid #2a2e38;
+              border-radius: 50%;
+              border-top-color: #7c5cff;
+              animation: spin 0.8s linear infinite;
+            }
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="checkmark">✅</div>
+          <h2>Canva connected successfully!</h2>
+          <p>Redirecting you back to the app...</p>
+          <div class="spinner"></div>
+          <p style="font-size: 14px; margin-top: 20px; color: #666;">
+            <a href="/" style="color: #7c5cff;">Click here if you're not redirected</a>
+          </p>
+          <script>
+            // Notify parent window if in popup
+            if (window.opener) {
+              window.opener.postMessage('canva-connected', '*');
+            }
+          </script>
+        </body>
+      </html>
     `);
   } catch (err) {
     console.error('OAuth callback failed:', err.message);
