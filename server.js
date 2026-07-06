@@ -207,3 +207,41 @@ app.listen(port, () => {
     console.warn(`⚠ Missing env vars: ${missing.join(', ')}`);
   }
 });
+// Add this route to server.js - Get user capabilities
+app.get('/api/capabilities', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ 
+        error: 'Not connected to Canva', 
+        connect_url: '/auth/canva' 
+      });
+    }
+
+    const response = await fetch('https://api.canva.com/rest/v1/users/me/capabilities', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch capabilities');
+    }
+
+    res.json({
+      connected: true,
+      capabilities: data.capabilities || [],
+      hasAutofill: data.capabilities?.includes('autofill') || false,
+      hasBrandTemplate: data.capabilities?.includes('brand_template') || false,
+      hasResize: data.capabilities?.includes('resize') || false
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      error: err.message,
+      details: err.details || null
+    });
+  }
+});
