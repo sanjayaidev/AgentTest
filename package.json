@@ -2,7 +2,7 @@
   "name": "canva-connect-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Standalone app that creates and exports Canva designs on behalf of a user via the Canva Connect API (OAuth 2.0 + PKCE) — no MCP allowlist required.",
+  "description": "Standalone app that creates and exports Canva designs via the Canva Connect API",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
