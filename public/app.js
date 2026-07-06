@@ -36,8 +36,8 @@ function render(connected) {
   createPanel.style.display = connected ? 'block' : 'none';
   exportPanel.style.display = connected ? 'block' : 'none';
   disconnectPanel.style.display = connected ? 'block' : 'none';
+  capabilitiesPanel.style.display = connected ? 'block' : 'none'; // Add this line
 }
-
 // If the OAuth callback ran in a popup, it posts a message back here.
 window.addEventListener('message', (e) => {
   if (e.data === 'canva-connected') refreshStatus();
