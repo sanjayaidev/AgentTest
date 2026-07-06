@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Canva Connect — design &amp; export</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2e38; --text:#e8eaed; --muted:#9aa0ab; --accent:#7c5cff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#666; display:inline-block; margin-right:8px; }
+  .status.connected .dot { background:#3ecf6f; }
+  .status.off .dot { background:#e5484d; }
+  button, a.btn { background: var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:8px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-block; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.secondary, a.btn.secondary { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  input, select { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); background:#0f1115; color:var(--text); margin-bottom:10px; font-size:14px; }
+  label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+  .result { margin-top:14px; padding:12px; background:#0f1115; border:1px solid var(--line); border-radius:8px; font-size:13px; word-break: break-all; }
+  .result a { color: var(--accent); }
+  .error { color:#e5484d; font-size:13px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>canva <span>connect</span></h1>
+  <div class="sub">Create and export Canva designs via the Connect API (OAuth 2.0 + PKCE) — self-service, no MCP allowlist needed.</div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="status off" id="status"><span class="dot"></span><span id="statusText">checking…</span></div>
+      <div id="connectArea">
+        <a class="btn" id="connectBtn" href="/auth/canva">Connect Canva</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="createPanel" style="display:none;">
+    <label>Design type</label>
+    <select id="designType">
+      <option value="doc">Document</option>
+      <option value="presentation">Presentation</option>
+      <option value="instagram-post">Instagram Post</option>
+      <option value="poster">Poster</option>
+    </select>
+    <label>Title (optional)</label>
+    <input id="designTitle" placeholder="e.g. Summer Sale" />
+    <button id="createBtn">Create design</button>
+    <div class="result" id="createResult" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="exportPanel" style="display:none;">
+    <label>Design ID (auto-filled after creating one above, or paste your own)</label>
+    <input id="designId" placeholder="DAxxxxxxxxx" />
+    <label>Export format</label>
+    <select id="exportFormat">
+      <option value="png">PNG</option>
+      <option value="jpg">JPG</option>
+      <option value="pdf">PDF</option>
+      <option value="pptx">PPTX</option>
+    </select>
+    <button id="exportBtn">Export design</button>
+    <div class="result" id="exportResult" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="disconnectPanel" style="display:none;">
+    <button class="secondary" id="disconnectBtn">Disconnect Canva</button>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
