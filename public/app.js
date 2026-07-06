@@ -107,7 +107,19 @@ exportBtn.addEventListener('click', async () => {
     exportBtn.textContent = 'Export design';
   }
 });
-
+// In public/app.js, add this event listener
+document.getElementById('connectBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  const width = 600;
+  const height = 700;
+  const left = (window.innerWidth - width) / 2;
+  const top = (window.innerHeight - height) / 2;
+  window.open(
+    this.href,
+    'Connect Canva',
+    `width=${width},height=${height},left=${left},top=${top}`
+  );
+});
 disconnectBtn.addEventListener('click', async () => {
   await fetch('/api/disconnect', { method: 'POST' });
   refreshStatus();
