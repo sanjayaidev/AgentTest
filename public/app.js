@@ -126,3 +126,81 @@ disconnectBtn.addEventListener('click', async () => {
 });
 
 refreshStatus();
+// Add these functions to public/app.js
+
+const capabilitiesBtn = document.getElementById('capabilitiesBtn');
+const capabilitiesResult = document.getElementById('capabilitiesResult');
+const capabilitiesList = document.getElementById('capabilitiesList');
+
+capabilitiesBtn?.addEventListener('click', async () => {
+  capabilitiesBtn.disabled = true;
+  capabilitiesBtn.textContent = 'Checking...';
+  capabilitiesResult.style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/capabilities');
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to check capabilities');
+    }
+    
+    // Build the display
+    let html = `
+      <div style="margin-bottom: 12px;">
+        <strong>Status:</strong> ${data.connected ? '✅ Connected' : '❌ Not connected'}
+      </div>
+      <div style="margin-bottom: 12px;">
+        <strong>Features available:</strong>
+        <ul style="margin: 8px 0 0 20px; line-height: 1.8;">
+    `;
+    
+    const features = [
+      { key: 'hasAutofill', label: 'Autofill (Brand Templates)', emoji: '✅' },
+      { key: 'hasBrandTemplate', label: 'Brand Template Access', emoji: '✅' },
+      { key: 'hasResize', label: 'Resize (Premium feature)', emoji: '✅' }
+    ];
+    
+    let hasAny = false;
+    features.forEach(f => {
+      if (data[f.key]) {
+        html += `<li>${f.emoji} ${f.label}</li>`;
+        hasAny = true;
+      }
+    });
+    
+    if (!hasAny) {
+      html += `<li>⚠️ No premium/enterprise features detected. You have a Canva ${data.capabilities?.length > 0 ? 'free' : 'basic'} account.</li>`;
+    }
+    
+    html += `</ul></div>`;
+    
+    // Show all capabilities
+    if (data.capabilities && data.capabilities.length > 0) {
+      html += `
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2e38;">
+          <strong>All capabilities:</strong>
+          <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;">
+            ${data.capabilities.map(c => `<span style="background: #1a1e26; padding: 4px 12px; border-radius: 12px; font-size: 12px;">${c}</span>`).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2e38; color: #9aa0ab;">
+          No capabilities found. You may be on a free Canva account.
+        </div>
+      `;
+    }
+    
+    capabilitiesList.innerHTML = html;
+    capabilitiesResult.style.display = 'block';
+    
+  } catch (err) {
+    capabilitiesList.innerHTML = `<div style="color: #e5484d;">Error: ${err.message}</div>`;
+    capabilitiesResult.style.display = 'block';
+  } finally {
+    capabilitiesBtn.disabled = false;
+    capabilitiesBtn.textContent = 'Check Canva Capabilities';
+  }
+});
