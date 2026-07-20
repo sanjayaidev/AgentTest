@@ -277,7 +277,7 @@ app.get('/api/designs/list', async (req, res) => {
   }
 });
 
-// Batch export multiple designs
+// Batch export multiple designs - returns CDN URLs directly
 app.post('/api/exports/batch', async (req, res) => {
   try {
     const token = await getValidAccessToken(req.sessionId);
@@ -299,10 +299,13 @@ app.post('/api/exports/batch', async (req, res) => {
         const finished = await waitForExport(token, job.id);
         
         if (finished.status === 'success') {
+          // Return CDN URLs directly for download
           return {
             designId,
             status: 'success',
-            urls: finished.urls || []
+            urls: finished.urls || [],
+            // Mark for CDN download
+            useCdn: true
           };
         } else {
           return {
@@ -323,6 +326,92 @@ app.post('/api/exports/batch', async (req, res) => {
     const batchResults = await Promise.all(exportPromises);
     res.json({ results: batchResults });
   } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, details: err.details });
+  }
+});
+
+// Endpoint to prepare Git LFS repository structure
+app.post('/api/exports/git-lfs', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
+    }
+
+    const { designIds, format, repoName = 'canva-exports' } = req.body || {};
+    if (!designIds || !Array.isArray(designIds) || designIds.length === 0) {
+      return res.status(400).json({ error: '"designIds" is required and must be a non-empty array' });
+    }
+
+    console.log('[DEBUG] Preparing Git LFS export for', designIds.length, 'designs');
+    
+    const batchResults = [];
+    const batchSize = 10; // Process in batches of 10
+    
+    // Process in smaller batches to avoid rate limits
+    for (let i = 0; i < designIds.length; i += batchSize) {
+      const batch = designIds.slice(i, i + batchSize);
+      console.log('[DEBUG] Processing batch', Math.floor(i / batchSize) + 1, 'with', batch.length, 'designs');
+      
+      const batchPromises = batch.map(async (designId) => {
+        try {
+          const job = await createExportJob(token, { designId, format });
+          const finished = await waitForExport(token, job.id);
+          
+          if (finished.status === 'success') {
+            return {
+              designId,
+              status: 'success',
+              urls: finished.urls || []
+            };
+          } else {
+            return {
+              designId,
+              status: 'failed',
+              error: finished.error || { message: 'Export failed' }
+            };
+          }
+        } catch (err) {
+          return {
+            designId,
+            status: 'failed',
+            error: { message: err.message }
+          };
+        }
+      });
+      
+      const batchCompleted = await Promise.all(batchPromises);
+      batchResults.push(...batchCompleted);
+      
+      // Small delay between batches
+      if (i + batchSize < designIds.length) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    
+    // Generate Git LFS tracking file content
+    const lfsTracking = batchResults
+      .filter(r => r.status === 'success' && r.urls.length > 0)
+      .map((result, index) => {
+        const filename = `${result.designId}.${format}`;
+        const url = result.urls[0];
+        return `version https://git-lfs.github.com/spec/v1
+oid sha256:${result.designId}
+size 0
+url ${url}`;
+      })
+      .join('\n\n');
+    
+    res.json({ 
+      results: batchResults,
+      repoName,
+      format,
+      totalProcessed: batchResults.length,
+      successCount: batchResults.filter(r => r.status === 'success').length,
+      lfsTracking
+    });
+  } catch (err) {
+    console.error('[ERROR] Git LFS export failed:', err);
     res.status(err.status || 500).json({ error: err.message, details: err.details });
   }
 });

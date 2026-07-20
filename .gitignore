@@ -1,1 +1,5 @@
-(public/export-app.js, public/export.html)
+```
+# Logs and temp files
+*.log
+server.log
+```

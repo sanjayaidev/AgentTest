@@ -10,6 +10,7 @@ const exportResult = document.getElementById('exportResult');
 const exportFormatEl = document.getElementById('exportFormat');
 const downloadBtn = document.getElementById('downloadBtn');
 const selectAllBtn = document.getElementById('selectAllBtn');
+const gitLfsBtn = document.getElementById('gitLfsBtn');
 const selectedCountEl = document.getElementById('selectedCount');
 const selectionStatusEl = document.getElementById('selectionStatus');
 
@@ -160,27 +161,49 @@ downloadBtn.addEventListener('click', async () => {
       throw new Error(data.error || `Request failed (${res.status})`);
     }
     
-    // Display results
+    // Display results with CDN URLs
     let html = '<div style="margin-bottom: 12px;"><strong>Export Results:</strong></div>';
+    html += '<div style="font-size: 12px; color: #9aa0ab; margin-bottom: 12px;">Files are hosted on Canva CDN. Right-click links and select "Save As" to download.</div>';
     
     if (data.results && data.results.length > 0) {
-      data.results.forEach((result, i) => {
-        const design = allDesigns.find(d => d.id === result.designId);
-        const title = design ? (design.title || '(untitled)') : result.designId;
-        
-        if (result.status === 'success' && result.urls && result.urls.length > 0) {
-          html += `<div style="margin-bottom: 8px; padding: 8px; background: #0f1115; border-radius: 6px;">`;
-          html += `<div style="margin-bottom: 4px;"><strong>${escapeHtml(title)}</strong></div>`;
-          result.urls.forEach((url, j) => {
-            html += `<div style="margin-left: 12px; font-size: 12px;"><a href="${url}" target="_blank" rel="noopener">Download ${j + 1} →</a></div>`;
-          });
-          html += `</div>`;
-        } else if (result.status === 'failed') {
-          html += `<div style="margin-bottom: 8px; padding: 8px; background: #0f1115; border-radius: 6px; color: #e5484d;">`;
-          html += `<div><strong>${escapeHtml(title)}</strong> - Failed: ${result.error?.message || 'unknown error'}</div>`;
-          html += `</div>`;
-        }
-      });
+      const successResults = data.results.filter(r => r.status === 'success');
+      const failedResults = data.results.filter(r => r.status === 'failed');
+      
+      if (successResults.length > 0) {
+        html += `<div style="margin-bottom: 16px; padding: 12px; background: #1a3d2e; border-radius: 8px; border: 1px solid #3ecf6f;">`;
+        html += `<div style="color: #3ecf6f; font-weight: 500; margin-bottom: 8px;">✓ ${successResults.length} successful export(s)</div>`;
+        html += `<div style="max-height: 400px; overflow-y: auto;">`;
+        successResults.forEach((result, i) => {
+          const design = allDesigns.find(d => d.id === result.designId);
+          const title = design ? (design.title || '(untitled)') : result.designId;
+          
+          if (result.urls && result.urls.length > 0) {
+            html += `<div style="margin-bottom: 12px; padding: 8px; background: #0f1115; border-radius: 6px;">`;
+            html += `<div style="margin-bottom: 6px; font-weight: 500;">${escapeHtml(title)}</div>`;
+            result.urls.forEach((url, j) => {
+              const filename = `${result.designId}_${j + 1}.${format}`;
+              html += `<div style="margin-left: 12px; font-size: 12px; margin-bottom: 4px;">`;
+              html += `<a href="${url}" target="_blank" rel="noopener" download="${filename}">⬇ Download ${j + 1}</a>`;
+              html += ` <span style="color: #666;">|</span> `;
+              html += `<a href="#" onclick="navigator.clipboard.writeText('${url}'); alert('URL copied!'); return false;" style="color: #7c5cff;">📋 Copy URL</a>`;
+              html += `</div>`;
+            });
+            html += `</div>`;
+          }
+        });
+        html += `</div></div>`;
+      }
+      
+      if (failedResults.length > 0) {
+        html += `<div style="margin-bottom: 16px; padding: 12px; background: #3d1a1a; border-radius: 8px; border: 1px solid #e5484d;">`;
+        html += `<div style="color: #e5484d; font-weight: 500; margin-bottom: 8px;">✗ ${failedResults.length} failed export(s)</div>`;
+        failedResults.forEach(result => {
+          const design = allDesigns.find(d => d.id === result.designId);
+          const title = design ? (design.title || '(untitled)') : result.designId;
+          html += `<div style="font-size: 13px; color: #e5484d;">${escapeHtml(title)}: ${result.error?.message || 'unknown error'}</div>`;
+        });
+        html += `</div>`;
+      }
     }
     
     exportResult.innerHTML = html;
@@ -204,6 +227,80 @@ downloadBtn.addEventListener('click', async () => {
         newCountEl.textContent = selectedDesigns.size;
       }
     }, 0);
+  }
+});
+
+// Git LFS Export button handler
+gitLfsBtn.addEventListener('click', async () => {
+  if (selectedDesigns.size === 0) {
+    alert('Please select at least one design to export');
+    return;
+  }
+  
+  const format = exportFormatEl.value;
+  const repoName = prompt('Enter repository name:', 'canva-exports');
+  if (!repoName) return;
+  
+  gitLfsBtn.disabled = true;
+  gitLfsBtn.textContent = 'Processing...';
+  exportResult.style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/exports/git-lfs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        designIds: Array.from(selectedDesigns), 
+        format,
+        repoName
+      }),
+    });
+    
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    
+    // Display Git LFS instructions
+    let html = '<div style="margin-bottom: 12px;"><strong>Git LFS Export Ready</strong></div>';
+    html += `<div style="padding: 12px; background: #1a2d3d; border-radius: 8px; border: 1px solid #7c5cff; margin-bottom: 16px;">`;
+    html += `<div style="font-weight: 500; margin-bottom: 8px;">Processed ${data.totalProcessed} designs (${data.successCount} successful)</div>`;
+    html += `<div style="font-size: 13px; line-height: 1.6;">`;
+    html += `<strong>Setup Instructions:</strong><br/>`;
+    html += `1. Create a new Git repository: <code>git init ${repoName}</code><br/>`;
+    html += `2. Initialize Git LFS: <code>git lfs install</code><br/>`;
+    html += `3. Create .gitattributes file with the tracking info below<br/>`;
+    html += `4. Use the provided CDN URLs to download files into the repo<br/>`;
+    html += `5. Commit and push to your remote<br/>`;
+    html += `</div></div>`;
+    
+    html += `<div style="margin-bottom: 8px;"><strong>.gitattributes content:</strong></div>`;
+    html += `<pre style="background: #0f1115; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto;">`;
+    html += escapeHtml(data.lfsTracking);
+    html += `</pre>`;
+    
+    html += `<div style="margin-top: 16px;"><strong>Download Script (bash):</strong></div>`;
+    html += `<pre style="background: #0f1115; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto;">`;
+    const downloadScript = data.results
+      .filter(r => r.status === 'success' && r.urls.length > 0)
+      .map((result, i) => {
+        const url = result.urls[0];
+        const filename = `${result.designId}.${format}`;
+        return `curl -L "${url}" -o "${filename}"`;
+      })
+      .join('\n');
+    html += escapeHtml(downloadScript);
+    html += `</pre>`;
+    
+    exportResult.innerHTML = html;
+    exportResult.style.display = 'block';
+    
+  } catch (err) {
+    exportResult.textContent = 'Error: ' + err.message;
+    exportResult.style.display = 'block';
+  } finally {
+    gitLfsBtn.disabled = false;
+    gitLfsBtn.textContent = 'Git LFS Export';
   }
 });
 
