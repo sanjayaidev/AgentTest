@@ -7,23 +7,30 @@
  *
  * Requirements:
  *   - Node.js 18+ (uses the built-in `fetch`)
- *   - git installed and authenticated (SSH key or credential helper) for the
- *     target GitHub repo
+ *   - git installed and authenticated (SSH key or credential helper)
  *   - A Canva integration (Client ID + Secret) created at
  *     https://www.canva.com/developers/integrations with these scopes enabled:
  *       design:content:read, design:meta:read, asset:read
  *     and redirect URI: http://127.0.0.1:8787/callback
  *
  * Config (env vars, or edit the CONFIG block below):
- *   CANVA_CLIENT_ID
- *   CANVA_CLIENT_SECRET
- *   GITHUB_REPO_URL     e.g. git@github.com:yourname/canva-designs.git
- *   OUTPUT_DIR          default: ./canva-designs
+ *   CANVA_CLIENT_ID      required
+ *   CANVA_CLIENT_SECRET  required
+ *   GITHUB_REPO_URL      optional, e.g. git@github.com:yourname/canva-designs.git
+ *                        If set: designs are pushed to that dedicated repo.
+ *                        If unset: run this from inside a repo you already
+ *                        have cloned (with a remote + push access) and the
+ *                        script commits the export folder straight into it.
+ *   OUTPUT_DIR           default: ./canva-designs
  *
- * Usage:
+ * Usage — into a dedicated repo:
  *   CANVA_CLIENT_ID=xxx CANVA_CLIENT_SECRET=yyy \
  *   GITHUB_REPO_URL=git@github.com:yourname/canva-designs.git \
  *   node canva-export-all.js
+ *
+ * Usage — into the repo you're already in (e.g. CodingAgentSM):
+ *   cd CodingAgentSM
+ *   CANVA_CLIENT_ID=xxx CANVA_CLIENT_SECRET=yyy node ../AgentTest/canva-export-all.js
  */
 
 const http = require("http");
@@ -45,11 +52,20 @@ function assertConfig() {
   const missing = [];
   if (!CONFIG.clientId) missing.push("CANVA_CLIENT_ID");
   if (!CONFIG.clientSecret) missing.push("CANVA_CLIENT_SECRET");
-  if (!CONFIG.githubRepoUrl) missing.push("GITHUB_REPO_URL");
+  // GITHUB_REPO_URL is optional: if unset, designs are committed straight
+  // into whichever git repo this script is being run from (current-repo mode).
   if (missing.length) {
     console.error(`Missing required env vars: ${missing.join(", ")}`);
     console.error("See the header of this script for setup instructions.");
     process.exit(1);
+  }
+}
+
+function findGitRoot(startDir) {
+  try {
+    return execSync("git rev-parse --show-toplevel", { cwd: startDir }).toString().trim();
+  } catch {
+    return null;
   }
 }
 
@@ -199,7 +215,7 @@ async function downloadFile(url, destPath) {
   fs.writeFileSync(destPath, buf);
 }
 
-// ---- Step 4: push to GitHub ----
+// ---- Step 4a: push to a dedicated GitHub repo (GITHUB_REPO_URL set) ----
 function pushToGitHub(dir) {
   const run = (cmd) => execSync(cmd, { cwd: dir, stdio: "inherit" });
   if (!fs.existsSync(path.join(dir, ".git"))) {
@@ -218,6 +234,37 @@ function pushToGitHub(dir) {
     console.log("Nothing new to commit.");
   }
   run("git push -u origin main");
+}
+
+// ---- Step 4b: commit the export folder into the repo this script is run from ----
+function pushToCurrentRepo(dir) {
+  const gitRoot = findGitRoot(dir);
+  if (!gitRoot) {
+    throw new Error(
+      "GITHUB_REPO_URL is not set and the output dir isn't inside a git repo. " +
+        "Either run this from inside a cloned repo (e.g. `cd AgentTest && node canva-export-all.js`), " +
+        "or set GITHUB_REPO_URL to push to a dedicated repo instead."
+    );
+  }
+  const run = (cmd) => execSync(cmd, { cwd: gitRoot, stdio: "inherit" });
+  const relDir = path.relative(gitRoot, dir) || ".";
+
+  let branch;
+  try {
+    branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: gitRoot }).toString().trim();
+  } catch {
+    throw new Error(`Could not determine current branch in ${gitRoot}`);
+  }
+
+  console.log(`Committing "${relDir}" into repo at ${gitRoot} (branch: ${branch})`);
+  run(`git add "${relDir}"`);
+  try {
+    run(`git commit -m "Sync Canva designs (${new Date().toISOString()})"`);
+  } catch {
+    console.log("Nothing new to commit.");
+    return;
+  }
+  run(`git push origin ${branch}`);
 }
 
 // ---- Main ----
@@ -251,7 +298,11 @@ async function main() {
   }
 
   console.log("\nAll designs processed. Pushing to GitHub...");
-  pushToGitHub(CONFIG.outputDir);
+  if (CONFIG.githubRepoUrl) {
+    pushToGitHub(CONFIG.outputDir);
+  } else {
+    pushToCurrentRepo(CONFIG.outputDir);
+  }
   console.log("Done.");
 }
 
