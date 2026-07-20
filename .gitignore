@@ -2,4 +2,9 @@
 # Logs and temp files
 *.log
 server.log
-```
+```node_modules/
+.env
+.env.local
+.env.*.local
+data/
+canva-designs/
