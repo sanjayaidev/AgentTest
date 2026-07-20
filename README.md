@@ -1,83 +1,58 @@
-# canva-connect-app
+# canva-export-all
 
-Standalone app that creates and exports Canva designs on behalf of a
-user, using the **Canva Connect API** (`api.canva.com` / OAuth 2.0 +
-PKCE) — a different, self-service integration surface from Canva's MCP
-server (`mcp.canva.com`).
+Downloads every design in your Canva account as PNG and pushes them to a
+GitHub repo — all from the terminal.
 
-**Why this exists:** Canva's MCP server requires your redirect URI to be
-manually approved via Canva's waitlist before you can even register an
-OAuth client (`Invalid redirect URI. It must be from an allowed host.`
-if you try before approval). The Connect API used here has no such
-gate — you self-serve an integration in the Developer Portal and start
-authorizing users immediately.
-
-This app is deliberately separate from any MCP-based project — it's a
-plain long-running Node/Express server, not a serverless function, so
-token storage can just be local JSON files. Don't deploy this to
-Vercel-style serverless as-is (see "Deploying" below if you want to).
+No npm packages needed (Node 18+ only).
 
 ## 1. Create a Canva integration
 
-1. Go to <https://www.canva.com/developers/integrations> and create a new integration.
-2. On the **Configuration** tab, copy the **Client ID**, then click **Generate secret** and copy the **Client Secret**. The secret is only shown once.
-3. On the **Authentication** tab, add a redirect URI. For local dev:
+1. Go to https://www.canva.com/developers/integrations → create a new integration.
+2. **Configuration** tab → copy the **Client ID**, click **Generate secret** → copy the **Client Secret** (only shown once).
+3. **Authentication** tab → add this redirect URI exactly:
    ```
-   http://localhost:3000/auth/canva/callback
+   http://127.0.0.1:8787/callback
    ```
-   This must match `CANVA_REDIRECT_URI` in your `.env` byte-for-byte (scheme, host, port, path, trailing slash).
-4. On the **Scopes** tab, enable at least:
+4. **Scopes** tab → enable:
    - `design:content:read`
-   - `design:content:write`
+   - `design:meta:read`
    - `asset:read`
-   - `asset:write`
 
-   You can only request scopes here — anything you ask for later in the OAuth URL that isn't enabled here will fail.
+## 2. Create the destination GitHub repo
 
-## 2. Configure
+Create an empty repo, e.g. `canva-designs`, on GitHub. Make sure `git` on
+your machine can push to it (SSH key added, or `gh auth login` / a
+credential helper set up).
 
-```bash
-cp .env.example .env
-```
-
-Fill in `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`, `CANVA_REDIRECT_URI` (matching step 1.3 exactly), and generate a `SESSION_SECRET`:
+## 3. Run it
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+CANVA_CLIENT_ID=your_client_id \
+CANVA_CLIENT_SECRET=your_client_secret \
+GITHUB_REPO_URL=git@github.com:yourname/canva-designs.git \
+node canva-export-all.js
 ```
 
-## 3. Run
+What happens:
 
-```bash
-npm install
-npm start
-```
+1. A browser tab opens (or a URL is printed) asking you to approve access
+   to your Canva account — this is a one-time authorization per run.
+2. The script lists every design in your account (handles pagination).
+3. Each design is exported as PNG and downloaded into
+   `./canva-designs/<title>-<designId>/`.
+4. The `canva-designs` folder is git-initialized (if needed), committed,
+   and pushed to `GITHUB_REPO_URL`.
 
-Open <http://localhost:3000>, click **Connect Canva**, approve access, then:
-- **Create design** — makes a blank design of the chosen type, gives you an "Open in Canva to edit" link
-- **Export design** — exports a design (by ID) to PNG/JPG/PDF/PPTX and gives you a download link
+## Notes
 
-Note: blank designs created via the API are auto-deleted if untouched for 7 days — this bypasses the user's trash, so it's permanent.
-
-## Deploying somewhere real
-
-This app uses:
-- A signed-cookie-free, random-hex session ID per browser (good enough for personal/small-team use, not a full auth system)
-- Local JSON files under `data/tokens/` for token storage — **this requires a persistent, single-instance filesystem**. It will NOT work correctly on Vercel/serverless (ephemeral filesystem, multiple instances) or behind a load balancer with more than one instance.
-
-To deploy on serverless or with multiple instances, swap `lib/tokenStore.js` for Redis/Postgres/etc — same pattern as `getTokens`/`saveTokens`/`deleteTokens`, just backed by a shared store instead of local disk. Also move `pendingAuth` (in `lib/canva.js`) to that same shared store, since right now it's an in-memory `Map` that only works within a single process.
-
-## Endpoints
-
-| Method | Path | What |
-|---|---|---|
-| GET | `/auth/canva` | Start OAuth flow (redirects to Canva) |
-| GET | `/auth/canva/callback` | OAuth redirect target, exchanges code for tokens |
-| GET | `/api/status` | `{ connected: boolean }` for the current session |
-| POST | `/api/disconnect` | Deletes stored tokens for the current session |
-| POST | `/api/designs` | Body: `{ designType?, title? }` → creates a design |
-| POST | `/api/exports` | Body: `{ designId, format? }` → exports and polls until done |
-
-## Scopes reference
-
-Full list: <https://www.canva.dev/docs/connect/appendix/scopes/>
+- Access tokens expire after ~4 hours; for a one-off bulk export this
+  script's single run is well within that window. If you want to re-run it
+  later, just run it again — it re-authorizes each time.
+- Multi-page designs export as `page-1.png`, `page-2.png`, etc.
+- Canva export download links expire after 24 hours — the script
+  downloads them immediately, so this isn't an issue.
+- If a specific design fails to export (e.g. unsupported type), the
+  script logs it and continues with the rest.
+- Rate limits: exports are capped at 75 per user per 5 minutes — if you
+  have hundreds of designs, the script may hit that and you may need to
+  re-run it to pick up any that failed.
