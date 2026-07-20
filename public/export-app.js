@@ -9,6 +9,7 @@ const exportResult = document.getElementById('exportResult');
 
 const exportFormatEl = document.getElementById('exportFormat');
 const downloadBtn = document.getElementById('downloadBtn');
+const downloadTxtBtn = document.getElementById('downloadTxtBtn');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const gitLfsBtn = document.getElementById('gitLfsBtn');
 const selectedCountEl = document.getElementById('selectedCount');
@@ -16,6 +17,7 @@ const selectionStatusEl = document.getElementById('selectionStatus');
 
 let allDesigns = [];
 let selectedDesigns = new Set();
+let lastExportResults = null; // Store CDN URLs for TXT download
 
 async function refreshStatus() {
   try {
@@ -129,6 +131,7 @@ function updateSelectionUI() {
   const count = selectedDesigns.size;
   selectedCountEl.textContent = count;
   downloadBtn.disabled = count === 0;
+  downloadTxtBtn.disabled = count === 0 || !lastExportResults;
   selectionStatusEl.textContent = count > 0 ? `${count} design(s) selected` : '';
 }
 
@@ -147,7 +150,7 @@ downloadBtn.addEventListener('click', async () => {
   exportResult.style.display = 'none';
   
   try {
-    const res = await fetch('/api/exports/batch', {
+    const res = await fetch('/api/exports/batch-sequential', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -161,9 +164,12 @@ downloadBtn.addEventListener('click', async () => {
       throw new Error(data.error || `Request failed (${res.status})`);
     }
     
+    // Store results for TXT download
+    lastExportResults = data.results.filter(r => r.status === 'success');
+    
     // Display results with CDN URLs
     let html = '<div style="margin-bottom: 12px;"><strong>Export Results:</strong></div>';
-    html += '<div style="font-size: 12px; color: #9aa0ab; margin-bottom: 12px;">Files are hosted on Canva CDN. Right-click links and select "Save As" to download.</div>';
+    html += '<div style="font-size: 12px; color: #9aa0ab; margin-bottom: 12px;">Files are hosted on Canva CDN. Right-click links and select "Save As" to download, or use the "Download TXT" button to get a script for Windows CMD.</div>';
     
     if (data.results && data.results.length > 0) {
       const successResults = data.results.filter(r => r.status === 'success');
@@ -208,6 +214,9 @@ downloadBtn.addEventListener('click', async () => {
     
     exportResult.innerHTML = html;
     exportResult.style.display = 'block';
+    
+    // Update TXT button state
+    updateSelectionUI();
     
     // Clear selection after successful export
     selectedDesigns.clear();
@@ -302,6 +311,54 @@ gitLfsBtn.addEventListener('click', async () => {
     gitLfsBtn.disabled = false;
     gitLfsBtn.textContent = 'Git LFS Export';
   }
+});
+
+// Download TXT button handler - generates Windows CMD script
+downloadTxtBtn.addEventListener('click', () => {
+  if (!lastExportResults || lastExportResults.length === 0) {
+    alert('No export results available. Please run an export first.');
+    return;
+  }
+  
+  const format = exportFormatEl.value;
+  
+  // Generate Windows CMD script
+  let cmdScript = '@echo off\r\n';
+  cmdScript += 'REM Canva CDN Download Script\r\n';
+  cmdScript += 'REM Run this file in Windows Command Prompt to download all exported files\r\n';
+  cmdScript += 'REM Files will be downloaded one at a time for better performance\r\n';
+  cmdScript += '\r\n';
+  cmdScript += `echo Starting download of ${lastExportResults.length} file(s)...\r\n`;
+  cmdScript += '\r\n';
+  
+  lastExportResults.forEach((result, index) => {
+    const design = allDesigns.find(d => d.id === result.designId);
+    const title = design ? (design.title || '(untitled)') : result.designId;
+    
+    if (result.urls && result.urls.length > 0) {
+      result.urls.forEach((url, j) => {
+        const filename = `${result.designId}_${j + 1}.${format}`;
+        cmdScript += `echo Downloading ${index + 1}/${lastExportResults.length}: ${filename}\r\n`;
+        cmdScript += `curl -L "${url}" -o "${filename}"\r\n`;
+        cmdScript += '\r\n';
+      });
+    }
+  });
+  
+  cmdScript += '\r\n';
+  cmdScript += 'echo All downloads complete!\r\n';
+  cmdScript += 'pause\r\n';
+  
+  // Create and download the file
+  const blob = new Blob([cmdScript], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `canva-download-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.bat`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 // Popup window for OAuth

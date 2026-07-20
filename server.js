@@ -277,7 +277,7 @@ app.get('/api/designs/list', async (req, res) => {
   }
 });
 
-// Batch export multiple designs - returns CDN URLs directly
+// Batch export multiple designs - returns CDN URLs directly (parallel processing)
 app.post('/api/exports/batch', async (req, res) => {
   try {
     const token = await getValidAccessToken(req.sessionId);
@@ -325,6 +325,62 @@ app.post('/api/exports/batch', async (req, res) => {
 
     const batchResults = await Promise.all(exportPromises);
     res.json({ results: batchResults });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, details: err.details });
+  }
+});
+
+// Sequential batch export - processes one file at a time for better reliability
+app.post('/api/exports/batch-sequential', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
+    }
+
+    const { designIds, format } = req.body || {};
+    if (!designIds || !Array.isArray(designIds) || designIds.length === 0) {
+      return res.status(400).json({ error: '"designIds" is required and must be a non-empty array' });
+    }
+
+    const results = [];
+    
+    // Process exports sequentially - one at a time
+    for (const designId of designIds) {
+      try {
+        console.log('[DEBUG] Exporting design:', designId);
+        const job = await createExportJob(token, { designId, format });
+        const finished = await waitForExport(token, job.id);
+        
+        if (finished.status === 'success') {
+          results.push({
+            designId,
+            status: 'success',
+            urls: finished.urls || []
+          });
+        } else {
+          results.push({
+            designId,
+            status: 'failed',
+            error: finished.error || { message: 'Export failed' }
+          });
+        }
+      } catch (err) {
+        console.error('[ERROR] Export failed for design:', designId, err.message);
+        results.push({
+          designId,
+          status: 'failed',
+          error: { message: err.message }
+        });
+      }
+      
+      // Small delay between exports to avoid rate limits
+      if (designIds.indexOf(designId) < designIds.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    res.json({ results });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message, details: err.details });
   }
