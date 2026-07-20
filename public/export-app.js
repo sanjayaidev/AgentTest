@@ -40,13 +40,17 @@ async function loadDesigns() {
     const res = await fetch('/api/designs/list');
     const data = await res.json();
     
+    console.log('[DEBUG] Received from /api/designs/list:', data);
+    
     if (!res.ok) {
       throw new Error(data.error || 'Failed to load designs');
     }
     
     allDesigns = data.designs || [];
+    console.log('[DEBUG] Loaded designs count:', allDesigns.length);
     renderDesignList();
   } catch (err) {
+    console.error('[ERROR] loadDesigns failed:', err);
     designListContainer.innerHTML = `<div class="error">Error loading designs: ${err.message}</div>`;
   }
 }

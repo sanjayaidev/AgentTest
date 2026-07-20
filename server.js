@@ -261,9 +261,18 @@ app.get('/api/designs/list', async (req, res) => {
       return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
     }
 
+    console.log('[DEBUG] Fetching designs for session:', req.sessionId);
     const designs = await listDesigns(token);
+    console.log('[DEBUG] Designs fetched:', designs?.length || 0);
+    
+    if (!designs || !Array.isArray(designs)) {
+      console.log('[DEBUG] Unexpected designs format:', designs);
+      return res.json({ designs: [], warning: 'Unexpected API response format', rawResponse: designs });
+    }
+    
     res.json({ designs });
   } catch (err) {
+    console.error('[ERROR] Failed to list designs:', err.message, err.details);
     res.status(err.status || 500).json({ error: err.message, details: err.details });
   }
 });
