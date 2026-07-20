@@ -12,6 +12,8 @@ const downloadBtn = document.getElementById('downloadBtn');
 const downloadTxtBtn = document.getElementById('downloadTxtBtn');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const gitLfsBtn = document.getElementById('gitLfsBtn');
+const downloadAllBatBtn = document.getElementById('downloadAllBatBtn');
+const downloadThumbsBatBtn = document.getElementById('downloadThumbsBatBtn');
 const selectedCountEl = document.getElementById('selectedCount');
 const selectionStatusEl = document.getElementById('selectionStatus');
 
@@ -367,6 +369,95 @@ downloadTxtBtn.addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// Download ALL Designs (.bat) button handler — no selection needed.
+// Server fetches every design via the Canva API, exports each one, and
+// streams back a ready-to-run Windows .bat file.
+downloadAllBatBtn.addEventListener('click', async () => {
+  const format = exportFormatEl.value;
+  const originalText = downloadAllBatBtn.textContent;
+
+  const confirmed = confirm(
+    `This will export every design in your Canva account as ${format.toUpperCase()} and build a ` +
+    `.bat file to download them all. This can take a while for large accounts. Continue?`
+  );
+  if (!confirmed) return;
+
+  downloadAllBatBtn.disabled = true;
+  downloadAllBatBtn.textContent = 'Exporting all designs… this can take a while';
+  exportResult.style.display = 'none';
+
+  try {
+    const res = await fetch(`/api/exports/all-as-bat?format=${encodeURIComponent(format)}`);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `canva-download-all-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.bat`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    exportResult.innerHTML =
+      '<div style="color:var(--success)">✓ .bat file downloaded. Double-click it on Windows — it will ' +
+      'create a "canva-downloads" folder next to itself and download every design into it.</div>';
+    exportResult.style.display = 'block';
+  } catch (err) {
+    exportResult.textContent = 'Error: ' + err.message;
+    exportResult.style.display = 'block';
+  } finally {
+    downloadAllBatBtn.disabled = false;
+    downloadAllBatBtn.textContent = originalText;
+  }
+});
+
+// Download ALL Thumbnails (.bat) button — rate-limit-free. Uses the
+// thumbnail URL already included in the design list response, so it never
+// calls Canva's /exports endpoint and never hits the 75/5min export cap.
+downloadThumbsBatBtn.addEventListener('click', async () => {
+  const originalText = downloadThumbsBatBtn.textContent;
+  downloadThumbsBatBtn.disabled = true;
+  downloadThumbsBatBtn.textContent = 'Building script…';
+  exportResult.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/designs/thumbnails-bat');
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `canva-thumbnails-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.bat`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    exportResult.innerHTML =
+      '<div style="color:var(--success)">✓ .bat file downloaded. Double-click it on Windows — it will ' +
+      'create a "canva-thumbnails" folder and download every design\'s thumbnail into it. No rate limit, ' +
+      'but these are preview-quality images, not full exports.</div>';
+    exportResult.style.display = 'block';
+  } catch (err) {
+    exportResult.textContent = 'Error: ' + err.message;
+    exportResult.style.display = 'block';
+  } finally {
+    downloadThumbsBatBtn.disabled = false;
+    downloadThumbsBatBtn.textContent = originalText;
+  }
 });
 
 // Popup window for OAuth
