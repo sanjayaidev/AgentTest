@@ -313,7 +313,7 @@ gitLfsBtn.addEventListener('click', async () => {
   }
 });
 
-// Download TXT button handler - generates Windows CMD script
+// Download TXT button handler - generates Windows CMD script with CDN URLs
 downloadTxtBtn.addEventListener('click', () => {
   if (!lastExportResults || lastExportResults.length === 0) {
     alert('No export results available. Please run an export first.');
@@ -322,34 +322,42 @@ downloadTxtBtn.addEventListener('click', () => {
   
   const format = exportFormatEl.value;
   
-  // Generate Windows CMD script
+  // Generate Windows CMD script with CDN URLs
   let cmdScript = '@echo off\r\n';
   cmdScript += 'REM Canva CDN Download Script\r\n';
   cmdScript += 'REM Run this file in Windows Command Prompt to download all exported files\r\n';
-  cmdScript += 'REM Files will be downloaded one at a time for better performance\r\n';
+  cmdScript += 'REM Files will be downloaded one at a time for better performance and reliability\r\n';
   cmdScript += '\r\n';
   cmdScript += `echo Starting download of ${lastExportResults.length} file(s)...\r\n`;
+  cmdScript += 'echo Files will be downloaded sequentially to avoid connection issues\r\n';
   cmdScript += '\r\n';
   
-  lastExportResults.forEach((result, index) => {
+  let fileIndex = 1;
+  const totalFiles = lastExportResults.reduce((sum, result) => sum + (result.urls ? result.urls.length : 0), 0);
+  
+  lastExportResults.forEach((result) => {
     const design = allDesigns.find(d => d.id === result.designId);
     const title = design ? (design.title || '(untitled)') : result.designId;
     
     if (result.urls && result.urls.length > 0) {
       result.urls.forEach((url, j) => {
         const filename = `${result.designId}_${j + 1}.${format}`;
-        cmdScript += `echo Downloading ${index + 1}/${lastExportResults.length}: ${filename}\r\n`;
+        cmdScript += `echo [${fileIndex}/${totalFiles}] Downloading: ${filename}\r\n`;
         cmdScript += `curl -L "${url}" -o "${filename}"\r\n`;
+        cmdScript += `if errorlevel 1 echo Warning: Failed to download ${filename}\r\n`;
         cmdScript += '\r\n';
+        fileIndex++;
       });
     }
   });
   
   cmdScript += '\r\n';
+  cmdScript += 'echo.\r\n';
   cmdScript += 'echo All downloads complete!\r\n';
-  cmdScript += 'pause\r\n';
+  cmdScript += 'echo Press any key to exit...\r\n';
+  cmdScript += 'pause > nul\r\n';
   
-  // Create and download the file
+  // Create and download the TXT file
   const blob = new Blob([cmdScript], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
