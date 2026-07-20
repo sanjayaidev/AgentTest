@@ -6,6 +6,8 @@ const connectArea = document.getElementById('connectArea');
 const createPanel = document.getElementById('createPanel');
 const exportPanel = document.getElementById('exportPanel');
 const disconnectPanel = document.getElementById('disconnectPanel');
+const exportAllPanel = document.getElementById('exportAllPanel');
+const capabilitiesPanel = document.getElementById('capabilitiesPanel');
 
 const createBtn = document.getElementById('createBtn');
 const createResult = document.getElementById('createResult');
@@ -36,7 +38,8 @@ function render(connected) {
   createPanel.style.display = connected ? 'block' : 'none';
   exportPanel.style.display = connected ? 'block' : 'none';
   disconnectPanel.style.display = connected ? 'block' : 'none';
-  capabilitiesPanel.style.display = connected ? 'block' : 'none'; // Add this line
+  exportAllPanel.style.display = connected ? 'block' : 'none';
+  capabilitiesPanel.style.display = connected ? 'block' : 'none';
 }
 // If the OAuth callback ran in a popup, it posts a message back here.
 window.addEventListener('message', (e) => {

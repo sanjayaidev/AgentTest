@@ -17,6 +17,7 @@ const {
   createDesign,
   createExportJob,
   waitForExport,
+  listDesigns,
 } = require('./lib/canva');
 const { saveTokens, deleteTokens } = require('./lib/tokenStore');
 
@@ -24,6 +25,12 @@ const REQUIRED_ENV = ['CANVA_CLIENT_ID', 'CANVA_CLIENT_SECRET', 'CANVA_REDIRECT_
 
 const app = express();
 app.use(express.json());
+
+// Serve the export page at /export (before static middleware to take precedence)
+app.get('/export', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'export.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SESSION_COOKIE = 'ccapp_session';
@@ -243,5 +250,70 @@ app.get('/api/capabilities', async (req, res) => {
       error: err.message,
       details: err.details || null
     });
+  }
+});
+
+// List all designs for the user
+app.get('/api/designs/list', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
+    }
+
+    const designs = await listDesigns(token);
+    res.json({ designs });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, details: err.details });
+  }
+});
+
+// Batch export multiple designs
+app.post('/api/exports/batch', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
+    }
+
+    const { designIds, format } = req.body || {};
+    if (!designIds || !Array.isArray(designIds) || designIds.length === 0) {
+      return res.status(400).json({ error: '"designIds" is required and must be a non-empty array' });
+    }
+
+    const results = [];
+    
+    // Process exports in parallel (with a reasonable limit)
+    const exportPromises = designIds.map(async (designId) => {
+      try {
+        const job = await createExportJob(token, { designId, format });
+        const finished = await waitForExport(token, job.id);
+        
+        if (finished.status === 'success') {
+          return {
+            designId,
+            status: 'success',
+            urls: finished.urls || []
+          };
+        } else {
+          return {
+            designId,
+            status: 'failed',
+            error: finished.error || { message: 'Export failed' }
+          };
+        }
+      } catch (err) {
+        return {
+          designId,
+          status: 'failed',
+          error: { message: err.message }
+        };
+      }
+    });
+
+    const batchResults = await Promise.all(exportPromises);
+    res.json({ results: batchResults });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, details: err.details });
   }
 });
