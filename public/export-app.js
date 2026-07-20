@@ -9,6 +9,7 @@ const exportResult = document.getElementById('exportResult');
 
 const exportFormatEl = document.getElementById('exportFormat');
 const downloadBtn = document.getElementById('downloadBtn');
+const selectAllBtn = document.getElementById('selectAllBtn');
 const selectedCountEl = document.getElementById('selectedCount');
 const selectionStatusEl = document.getElementById('selectionStatus');
 
@@ -94,6 +95,24 @@ function renderDesignList() {
   
   updateSelectionUI();
 }
+
+// Select All button handler
+selectAllBtn.addEventListener('click', () => {
+  const checkboxes = document.querySelectorAll('.design-item input[type="checkbox"]');
+  const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+  
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = !allSelected;
+    if (checkbox.checked) {
+      selectedDesigns.add(checkbox.value);
+    } else {
+      selectedDesigns.delete(checkbox.value);
+    }
+  });
+  
+  selectAllBtn.textContent = allSelected ? 'Select All' : 'Deselect All';
+  updateSelectionUI();
+});
 
 function handleCheckboxChange(e) {
   const designId = e.target.value;
