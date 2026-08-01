@@ -276,7 +276,18 @@ app.get('/api/exports/all-as-bat', async (req, res) => {
 
     const format = (req.query.format || 'png').toString();
 
-    const designs = await listDesigns(token);
+    // Fetch all designs using pagination (5 at a time to respect rate limits)
+    const allDesigns = [];
+    let continuation = null;
+    
+    do {
+      const result = await listDesigns(token, { limit: 5, continuation });
+      allDesigns.push(...result.designs);
+      continuation = result.continuation;
+    } while (continuation);
+    
+    const designs = allDesigns;
+    
     if (!designs.length) {
       return res.status(404).json({ error: 'No designs found in this Canva account' });
     }
@@ -377,7 +388,18 @@ app.get('/api/designs/thumbnails-bat', async (req, res) => {
       return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
     }
 
-    const designs = await listDesigns(token);
+    // Fetch all designs using pagination (5 at a time to respect rate limits)
+    const allDesigns = [];
+    let continuation = null;
+    
+    do {
+      const result = await listDesigns(token, { limit: 5, continuation });
+      allDesigns.push(...result.designs);
+      continuation = result.continuation;
+    } while (continuation);
+    
+    const designs = allDesigns;
+    
     if (!designs.length) {
       return res.status(404).json({ error: 'No designs found in this Canva account' });
     }
@@ -442,7 +464,7 @@ app.get('/api/capabilities', async (req, res) => {
   }
 });
 
-// List all designs for the user
+// List designs with pagination support
 app.get('/api/designs/list', async (req, res) => {
   try {
     const token = await getValidAccessToken(req.sessionId);
@@ -450,16 +472,23 @@ app.get('/api/designs/list', async (req, res) => {
       return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
     }
 
-    console.log('[DEBUG] Fetching designs for session:', req.sessionId);
-    const designs = await listDesigns(token);
-    console.log('[DEBUG] Designs fetched:', designs?.length || 0);
+    const continuation = req.query.continuation || null;
+    const limit = parseInt(req.query.limit) || 5;
+
+    console.log('[DEBUG] Fetching designs for session:', req.sessionId, 'limit:', limit, 'continuation:', continuation);
+    const result = await listDesigns(token, { limit, continuation });
+    console.log('[DEBUG] Designs fetched:', result.designs?.length || 0);
     
-    if (!designs || !Array.isArray(designs)) {
-      console.log('[DEBUG] Unexpected designs format:', designs);
-      return res.json({ designs: [], warning: 'Unexpected API response format', rawResponse: designs });
+    if (!result.designs || !Array.isArray(result.designs)) {
+      console.log('[DEBUG] Unexpected designs format:', result);
+      return res.json({ designs: [], warning: 'Unexpected API response format', rawResponse: result });
     }
     
-    res.json({ designs });
+    res.json({ 
+      designs: result.designs,
+      continuation: result.continuation,
+      hasMore: result.hasMore
+    });
   } catch (err) {
     console.error('[ERROR] Failed to list designs:', err.message, err.details);
     res.status(err.status || 500).json({ error: err.message, details: err.details });

@@ -29,11 +29,13 @@
   
   /* Design list styles */
   .design-list { margin-top: 16px; }
-  .design-item { display: flex; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: #0f1115; }
-  .design-item:hover { border-color: var(--accent); }
-  .design-item input[type="checkbox"] { width: auto; margin-right: 12px; }
-  .design-info { flex: 1; }
-  .design-title { font-weight: 500; margin-bottom: 4px; }
+  .design-item { display: flex; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: #0f1115; transition: all 0.2s ease; }
+  .design-item:hover { border-color: var(--accent); transform: translateX(4px); }
+  .design-item input[type="checkbox"] { width: auto; margin-right: 12px; accent-color: var(--accent); }
+  .design-thumbnail { width: 120px; height: 68px; object-fit: cover; border-radius: 6px; margin-right: 12px; background: #0f1115; flex-shrink: 0; }
+  .design-thumbnail-placeholder { width: 120px; height: 68px; display: flex; align-items: center; justify-content: center; background: #1a1e26; border-radius: 6px; margin-right: 12px; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+  .design-info { flex: 1; min-width: 0; }
+  .design-title { font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .design-meta { font-size: 12px; color: var(--muted); }
   .design-type { display: inline-block; padding: 2px 8px; background: var(--line); border-radius: 4px; font-size: 11px; margin-left: 8px; }
   
@@ -44,8 +46,22 @@
   .empty-state { text-align: center; padding: 40px; color: var(--muted); }
   .empty-state a { color: var(--accent); }
   
-  .back-link { display: inline-block; margin-bottom: 20px; color: var(--muted); text-decoration: none; }
+  .back-link { display: inline-block; margin-bottom: 20px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
   .back-link:hover { color: var(--accent); }
+  
+  /* Fetch more button */
+  .fetch-more-container { text-align: center; margin-top: 20px; }
+  .fetch-more-btn { background: transparent; border: 1px solid var(--line); color: var(--text); padding: 12px 24px; font-size: 14px; }
+  .fetch-more-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .fetch-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  
+  /* Export result improvements */
+  .export-success { background: #1a3d2e; border: 1px solid #3ecf6f; }
+  .export-failed { background: #3d1a1a; border: 1px solid #e5484d; }
+  .download-link { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .download-link:hover { text-decoration: underline; }
+  .copy-url-btn { color: #7c5cff; background: none; border: none; cursor: pointer; padding: 0; font-size: 12px; }
+  .copy-url-btn:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -83,6 +99,10 @@
     
     <div id="designListContainer">
       <div class="loading">Loading designs…</div>
+    </div>
+    
+    <div id="fetchMoreContainer" class="fetch-more-container" style="display:none;">
+      <button id="fetchMoreBtn" class="fetch-more-btn">Fetch More Designs</button>
     </div>
     
     <div class="result" id="exportResult" style="display:none;"></div>
