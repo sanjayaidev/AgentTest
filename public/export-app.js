@@ -5,6 +5,8 @@ const statusText = document.getElementById('statusText');
 const connectArea = document.getElementById('connectArea');
 const exportPanel = document.getElementById('exportPanel');
 const designListContainer = document.getElementById('designListContainer');
+const fetchMoreContainer = document.getElementById('fetchMoreContainer');
+const fetchMoreBtn = document.getElementById('fetchMoreBtn');
 const exportResult = document.getElementById('exportResult');
 
 const exportFormatEl = document.getElementById('exportFormat');
@@ -20,6 +22,8 @@ const selectionStatusEl = document.getElementById('selectionStatus');
 let allDesigns = [];
 let selectedDesigns = new Set();
 let lastExportResults = null; // Store CDN URLs for TXT download
+let continuationToken = null; // For pagination
+let isLoadingDesigns = false;
 
 async function refreshStatus() {
   try {
@@ -41,9 +45,17 @@ function render(connected) {
   exportPanel.style.display = connected ? 'block' : 'none';
 }
 
-async function loadDesigns() {
+async function loadDesigns(isAppend = false) {
+  if (isLoadingDesigns) return;
+  
+  isLoadingDesigns = true;
+  if (!isAppend) {
+    designListContainer.innerHTML = '<div class="loading">Loading designs…</div>';
+  }
+  
   try {
-    const res = await fetch('/api/designs/list');
+    const url = `/api/designs/list?limit=5${continuationToken ? `&continuation=${encodeURIComponent(continuationToken)}` : ''}`;
+    const res = await fetch(url);
     const data = await res.json();
     
     console.log('[DEBUG] Received from /api/designs/list:', data);
@@ -52,12 +64,35 @@ async function loadDesigns() {
       throw new Error(data.error || 'Failed to load designs');
     }
     
-    allDesigns = data.designs || [];
-    console.log('[DEBUG] Loaded designs count:', allDesigns.length);
+    if (isAppend) {
+      allDesigns = [...allDesigns, ...(data.designs || [])];
+    } else {
+      allDesigns = data.designs || [];
+    }
+    
+    continuationToken = data.continuation || null;
+    
+    console.log('[DEBUG] Loaded designs count:', allDesigns.length, 'hasMore:', data.hasMore);
     renderDesignList();
+    
+    // Show/hide fetch more button
+    if (data.hasMore) {
+      fetchMoreContainer.style.display = 'block';
+      fetchMoreBtn.disabled = false;
+      fetchMoreBtn.textContent = 'Fetch More Designs';
+    } else {
+      fetchMoreContainer.style.display = 'none';
+    }
   } catch (err) {
     console.error('[ERROR] loadDesigns failed:', err);
-    designListContainer.innerHTML = `<div class="error">Error loading designs: ${err.message}</div>`;
+    if (!isAppend) {
+      designListContainer.innerHTML = `<div class="error">Error loading designs: ${err.message}</div>`;
+    } else {
+      fetchMoreBtn.textContent = 'Error - Retry';
+      fetchMoreBtn.disabled = false;
+    }
+  } finally {
+    isLoadingDesigns = false;
   }
 }
 
@@ -78,10 +113,15 @@ function renderDesignList() {
     const title = design.title || '(untitled)';
     const designType = design.design_type?.name || design.design_type?.type || 'unknown';
     const createdAt = design.created_at ? new Date(design.created_at).toLocaleDateString() : '';
+    const thumbnailUrl = design.thumbnail?.url;
     
     html += `
       <div class="design-item">
         <input type="checkbox" id="design-${design.id}" value="${design.id}" />
+        ${thumbnailUrl 
+          ? `<img src="${thumbnailUrl}" alt="Thumbnail" class="design-thumbnail" loading="lazy" />`
+          : `<div class="design-thumbnail-placeholder">No preview</div>`
+        }
         <div class="design-info">
           <div class="design-title">${escapeHtml(title)} <span class="design-type">${escapeHtml(designType)}</span></div>
           <div class="design-meta">ID: ${design.id}${createdAt ? ' • Created: ' + createdAt : ''}</div>
@@ -100,6 +140,13 @@ function renderDesignList() {
   
   updateSelectionUI();
 }
+
+// Fetch More button handler
+fetchMoreBtn?.addEventListener('click', () => {
+  fetchMoreBtn.disabled = true;
+  fetchMoreBtn.textContent = 'Loading...';
+  loadDesigns(true); // true = append to existing list
+});
 
 // Select All button handler
 selectAllBtn.addEventListener('click', () => {
@@ -178,7 +225,7 @@ downloadBtn.addEventListener('click', async () => {
       const failedResults = data.results.filter(r => r.status === 'failed');
       
       if (successResults.length > 0) {
-        html += `<div style="margin-bottom: 16px; padding: 12px; background: #1a3d2e; border-radius: 8px; border: 1px solid #3ecf6f;">`;
+        html += `<div class="export-success" style="margin-bottom: 16px; padding: 12px; border-radius: 8px;">`;
         html += `<div style="color: #3ecf6f; font-weight: 500; margin-bottom: 8px;">✓ ${successResults.length} successful export(s)</div>`;
         html += `<div style="max-height: 400px; overflow-y: auto;">`;
         successResults.forEach((result, i) => {
@@ -191,9 +238,9 @@ downloadBtn.addEventListener('click', async () => {
             result.urls.forEach((url, j) => {
               const filename = `${result.designId}_${j + 1}.${format}`;
               html += `<div style="margin-left: 12px; font-size: 12px; margin-bottom: 4px;">`;
-              html += `<a href="${url}" target="_blank" rel="noopener" download="${filename}">⬇ Download ${j + 1}</a>`;
+              html += `<a href="${url}" target="_blank" rel="noopener" download="${filename}" class="download-link">⬇ Download ${j + 1}</a>`;
               html += ` <span style="color: #666;">|</span> `;
-              html += `<a href="#" onclick="navigator.clipboard.writeText('${url}'); alert('URL copied!'); return false;" style="color: #7c5cff;">📋 Copy URL</a>`;
+              html += `<button class="copy-url-btn" onclick="navigator.clipboard.writeText('${url}').then(() => alert('URL copied!')).catch(err => console.error('Copy failed:', err)); return false;">📋 Copy URL</button>`;
               html += `</div>`;
             });
             html += `</div>`;
@@ -203,7 +250,7 @@ downloadBtn.addEventListener('click', async () => {
       }
       
       if (failedResults.length > 0) {
-        html += `<div style="margin-bottom: 16px; padding: 12px; background: #3d1a1a; border-radius: 8px; border: 1px solid #e5484d;">`;
+        html += `<div class="export-failed" style="margin-bottom: 16px; padding: 12px; border-radius: 8px;">`;
         html += `<div style="color: #e5484d; font-weight: 500; margin-bottom: 8px;">✗ ${failedResults.length} failed export(s)</div>`;
         failedResults.forEach(result => {
           const design = allDesigns.find(d => d.id === result.designId);
