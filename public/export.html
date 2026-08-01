@@ -8,7 +8,7 @@
   :root { --bg:#0f1115; --panel:#171a21; --line:#2a2e38; --text:#e8eaed; --muted:#9aa0ab; --accent:#7c5cff; --success:#3ecf6f; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   h1 span { color: var(--accent); }
   .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
@@ -29,15 +29,33 @@
   
   /* Design list styles */
   .design-list { margin-top: 16px; }
-  .design-item { display: flex; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: #0f1115; transition: all 0.2s ease; }
-  .design-item:hover { border-color: var(--accent); transform: translateX(4px); }
-  .design-item input[type="checkbox"] { width: auto; margin-right: 12px; accent-color: var(--accent); }
-  .design-thumbnail { width: 120px; height: 68px; object-fit: cover; border-radius: 6px; margin-right: 12px; background: #0f1115; flex-shrink: 0; }
-  .design-thumbnail-placeholder { width: 120px; height: 68px; display: flex; align-items: center; justify-content: center; background: #1a1e26; border-radius: 6px; margin-right: 12px; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+  .design-item { display: block; padding: 16px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; background: #0f1115; transition: all 0.2s ease; }
+  .design-item:hover { border-color: var(--accent); }
+  .design-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .design-item input[type="checkbox"] { width: auto; margin-right: 0; accent-color: var(--accent); transform: scale(1.2); }
+  .design-thumbnail { width: 160px; height: 90px; object-fit: cover; border-radius: 8px; background: #0f1115; flex-shrink: 0; }
+  .design-thumbnail-placeholder { width: 160px; height: 90px; display: flex; align-items: center; justify-content: center; background: #1a1e26; border-radius: 8px; color: var(--muted); font-size: 11px; flex-shrink: 0; }
   .design-info { flex: 1; min-width: 0; }
-  .design-title { font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .design-title { font-weight: 500; font-size: 15px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .design-meta { font-size: 12px; color: var(--muted); }
   .design-type { display: inline-block; padding: 2px 8px; background: var(--line); border-radius: 4px; font-size: 11px; margin-left: 8px; }
+  
+  /* Slides container */
+  .slides-container { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .slides-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .slides-title { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .slide-toggle-btn { background: transparent; border: 1px solid var(--line); color: var(--text); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .slide-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .slides-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .slide-item { background: #0f1115; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; transition: all 0.2s; }
+  .slide-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .slide-thumbnail { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+  .slide-thumbnail-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: #1a1e26; color: var(--muted); font-size: 11px; }
+  .slide-footer { padding: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .slide-number { font-size: 11px; color: var(--muted); }
+  .slide-download-btn { background: var(--accent); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; text-decoration: none; }
+  .slide-download-btn:hover { opacity: 0.9; }
+  .slides-hidden .slides-grid { display: none; }
   
   .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
   .toolbar select { width: auto; margin-bottom: 0; }

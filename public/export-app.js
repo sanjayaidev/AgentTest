@@ -114,18 +114,32 @@ function renderDesignList() {
     const designType = design.design_type?.name || design.design_type?.type || 'unknown';
     const createdAt = design.created_at ? new Date(design.created_at).toLocaleDateString() : '';
     const thumbnailUrl = design.thumbnail?.url;
+    const pageCount = design.page_count || 1;
     
     html += `
-      <div class="design-item">
-        <input type="checkbox" id="design-${design.id}" value="${design.id}" />
-        ${thumbnailUrl 
-          ? `<img src="${thumbnailUrl}" alt="Thumbnail" class="design-thumbnail" loading="lazy" />`
-          : `<div class="design-thumbnail-placeholder">No preview</div>`
-        }
-        <div class="design-info">
-          <div class="design-title">${escapeHtml(title)} <span class="design-type">${escapeHtml(designType)}</span></div>
-          <div class="design-meta">ID: ${design.id}${createdAt ? ' • Created: ' + createdAt : ''}</div>
+      <div class="design-item" id="design-item-${design.id}">
+        <div class="design-header">
+          <input type="checkbox" id="design-${design.id}" value="${design.id}" />
+          ${thumbnailUrl 
+            ? `<img src="${thumbnailUrl}" alt="Thumbnail" class="design-thumbnail" loading="lazy" />`
+            : `<div class="design-thumbnail-placeholder">No preview</div>`
+          }
+          <div class="design-info">
+            <div class="design-title">${escapeHtml(title)} <span class="design-type">${escapeHtml(designType)}</span></div>
+            <div class="design-meta">ID: ${design.id}${createdAt ? ' • Created: ' + createdAt : ''}${pageCount > 1 ? ` • ${pageCount} slides` : ''}</div>
+          </div>
         </div>
+        ${pageCount > 1 ? `
+        <div class="slides-container slides-hidden" id="slides-container-${design.id}">
+          <div class="slides-header">
+            <span class="slides-title">${pageCount} slides/pages</span>
+            <button class="slide-toggle-btn" onclick="toggleSlides('${design.id}')">Show All Slides</button>
+          </div>
+          <div class="slides-grid" id="slides-grid-${design.id}">
+            <div class="loading">Loading slides...</div>
+          </div>
+        </div>
+        ` : ''}
       </div>
     `;
   });
@@ -140,6 +154,96 @@ function renderDesignList() {
   
   updateSelectionUI();
 }
+
+// Toggle slides visibility and load slides on demand
+window.toggleSlides = async function(designId) {
+  const container = document.getElementById(`slides-container-${designId}`);
+  const grid = document.getElementById(`slides-grid-${designId}`);
+  const toggleBtn = container.querySelector('.slide-toggle-btn');
+  
+  if (container.classList.contains('slides-hidden')) {
+    // Show slides - load them if not already loaded
+    if (grid.querySelector('.loading') || grid.querySelector('.slide-item') === null) {
+      try {
+        const res = await fetch(`/api/designs/${designId}/pages`);
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load slides');
+        }
+        
+        const pages = data.pages || [];
+        if (pages.length === 0) {
+          grid.innerHTML = '<div class="empty-state">No slides available</div>';
+        } else {
+          let slideHtml = '';
+          pages.forEach((page, index) => {
+            const pageThumbnail = page.thumbnail?.url;
+            slideHtml += `
+              <div class="slide-item">
+                ${pageThumbnail 
+                  ? `<img src="${pageThumbnail}" alt="Slide ${index + 1}" class="slide-thumbnail" loading="lazy" />`
+                  : `<div class="slide-thumbnail-placeholder">No preview</div>`
+                }
+                <div class="slide-footer">
+                  <span class="slide-number">Slide ${index + 1}</span>
+                  <button class="slide-download-btn" onclick="downloadSlide('${designId}', '${page.id || index}')">Download</button>
+                </div>
+              </div>
+            `;
+          });
+          grid.innerHTML = slideHtml;
+        }
+      } catch (err) {
+        console.error('Failed to load slides:', err);
+        grid.innerHTML = `<div class="error">Failed to load slides: ${err.message}</div>`;
+      }
+    }
+    container.classList.remove('slides-hidden');
+    toggleBtn.textContent = 'Hide Slides';
+  } else {
+    // Hide slides
+    container.classList.add('slides-hidden');
+    toggleBtn.textContent = 'Show All Slides';
+  }
+};
+
+// Download individual slide
+window.downloadSlide = async function(designId, pageId) {
+  const format = exportFormatEl.value;
+  try {
+    const res = await fetch('/api/exports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        designId,
+        format,
+        pageId: pageId !== String(parseInt(pageId)) ? pageId : undefined // Only send if it's a string ID
+      }),
+    });
+    
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    
+    const job = data.job;
+    if (job.status === 'success' && job.urls && job.urls.length > 0) {
+      const url = job.urls[0];
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${designId}_slide_${pageId}.${format}`;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.click();
+    } else {
+      alert('Export failed or no download URL returned');
+    }
+  } catch (err) {
+    console.error('Slide download failed:', err);
+    alert(`Failed to download slide: ${err.message}`);
+  }
+};
 
 // Fetch More button handler
 fetchMoreBtn?.addEventListener('click', () => {
