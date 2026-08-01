@@ -114,7 +114,7 @@ function renderDesignList() {
     const designType = design.design_type?.name || design.design_type?.type || 'unknown';
     const createdAt = design.created_at ? new Date(design.created_at).toLocaleDateString() : '';
     const thumbnailUrl = design.thumbnail?.url;
-    const pageCount = design.page_count || 1;
+    const pageCount = design.page_count || 0; // Don't default to 1, use 0 to indicate unknown
     
     html += `
       <div class="design-item" id="design-item-${design.id}">
@@ -126,20 +126,18 @@ function renderDesignList() {
           }
           <div class="design-info">
             <div class="design-title">${escapeHtml(title)} <span class="design-type">${escapeHtml(designType)}</span></div>
-            <div class="design-meta">ID: ${design.id}${createdAt ? ' • Created: ' + createdAt : ''}${pageCount > 1 ? ` • ${pageCount} slides` : ''}</div>
+            <div class="design-meta">ID: ${design.id}${createdAt ? ' • Created: ' + createdAt : ''}${pageCount > 0 ? ` • ${pageCount} slides` : ''}</div>
           </div>
         </div>
-        ${pageCount > 1 ? `
         <div class="slides-container slides-hidden" id="slides-container-${design.id}">
           <div class="slides-header">
-            <span class="slides-title">${pageCount} slides/pages</span>
+            <span class="slides-title">${pageCount > 0 ? `${pageCount} slides/pages` : 'Slides/Pages'}</span>
             <button class="slide-toggle-btn" onclick="toggleSlides('${design.id}')">Show All Slides</button>
           </div>
           <div class="slides-grid" id="slides-grid-${design.id}">
             <div class="loading">Loading slides...</div>
           </div>
         </div>
-        ` : ''}
       </div>
     `;
   });
