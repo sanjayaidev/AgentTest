@@ -18,6 +18,7 @@ const {
   createExportJob,
   waitForExport,
   listDesigns,
+  getDesignPages,
 } = require('./lib/canva');
 const { saveTokens, deleteTokens } = require('./lib/tokenStore');
 
@@ -491,6 +492,30 @@ app.get('/api/designs/list', async (req, res) => {
     });
   } catch (err) {
     console.error('[ERROR] Failed to list designs:', err.message, err.details);
+    res.status(err.status || 500).json({ error: err.message, details: err.details });
+  }
+});
+
+// Get design pages/slides for a specific design
+app.get('/api/designs/:designId/pages', async (req, res) => {
+  try {
+    const token = await getValidAccessToken(req.sessionId);
+    if (!token) {
+      return res.status(403).json({ error: 'Not connected', connect_url: '/auth/canva' });
+    }
+
+    const { designId } = req.params;
+    if (!designId) {
+      return res.status(400).json({ error: 'designId is required' });
+    }
+
+    console.log('[DEBUG] Fetching pages for design:', designId);
+    const pages = await getDesignPages(token, designId);
+    console.log('[DEBUG] Pages fetched:', pages.length);
+    
+    res.json({ pages });
+  } catch (err) {
+    console.error('[ERROR] Failed to fetch design pages:', err.message, err.details);
     res.status(err.status || 500).json({ error: err.message, details: err.details });
   }
 });
